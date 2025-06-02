@@ -23,3 +23,9 @@ target_link_libraries(demo_weighted_kmeans PRIVATE faiss)
 
 add_executable(demo_residual_quantizer EXCLUDE_FROM_ALL demo_residual_quantizer.cpp)
 target_link_libraries(demo_residual_quantizer PRIVATE faiss)
+
+add_executable(demo_pq_profiling EXCLUDE_FROM_ALL demo_pq_profiling.cpp)
+target_link_libraries(demo_pq_profiling PRIVATE faiss_avx2)
+
+add_executable(demo_yoochan EXCLUDE_FROM_ALL demo_yoochan.cpp)
+target_link_libraries(demo_yoochan PRIVATE faiss_avx2)

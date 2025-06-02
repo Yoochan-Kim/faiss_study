@@ -9,6 +9,7 @@
 
 #include <faiss/impl/ProductQuantizer.h>
 
+#include <faiss/utils/TimeProfiler.h>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -397,6 +398,7 @@ int product_quantizer_compute_codes_bs = 256 * 1024;
 
 void ProductQuantizer::compute_codes(const float* x, uint8_t* codes, size_t n)
         const {
+    SCOPED_TIMER("PQ::compute_codes");
     // process by blocks to avoid using too much RAM
     size_t bs = product_quantizer_compute_codes_bs;
     if (n > bs) {
@@ -428,6 +430,7 @@ void ProductQuantizer::compute_codes(const float* x, uint8_t* codes, size_t n)
 
 void ProductQuantizer::compute_distance_table(const float* x, float* dis_table)
         const {
+    SCOPED_TIMER("PQ::compute_distance_table");
     if (transposed_centroids.empty()) {
         // use regular version
         for (size_t m = 0; m < M; m++) {
@@ -473,12 +476,15 @@ void ProductQuantizer::compute_distance_tables(
         const float* x,
         float* dis_tables) const {
 #if defined(__AVX2__) || defined(__aarch64__)
+
     if (dsub == 2 && nbits < 8) { // interesting for a narrow range of settings
+        SCOPED_TIMER("PQ::compute_distance_tables (simd)");
         compute_PQ_dis_tables_dsub2(
                 d, ksub, centroids.data(), nx, x, false, dis_tables);
     } else
 #endif
             if (dsub < 16) {
+    SCOPED_TIMER("PQ::compute_distance_tables (omp)");
 
 #pragma omp parallel for if (nx > 1)
         for (int64_t i = 0; i < nx; i++) {
@@ -486,6 +492,8 @@ void ProductQuantizer::compute_distance_tables(
         }
 
     } else { // use BLAS
+    SCOPED_TIMER("PQ::compute_distance_tables (blas)");
+
 
         for (int m = 0; m < M; m++) {
             pairwise_L2sqr(
@@ -687,6 +695,8 @@ void pq_knn_search_with_tables(
         bool init_finalize_heap) {
     size_t k = res->k, nx = res->nh;
     size_t ksub = pq.ksub, M = pq.M;
+    SCOPED_TIMER("PQ::knn_search_with_tables");
+
 
 #pragma omp parallel for if (nx > 1)
     for (int64_t i = 0; i < nx; i++) {
@@ -703,32 +713,44 @@ void pq_knn_search_with_tables(
 
         switch (nbits) {
             case 8:
-                pq_estimators_from_tables<uint8_t, C>(
-                        pq, codes, ncodes, dis_table, k, heap_dis, heap_ids);
-                break;
+                {
+                    // SCOPED_TIMER("PQ::estimators_from_tables <uint8>");
+
+                    pq_estimators_from_tables<uint8_t, C>(
+                            pq, codes, ncodes, dis_table, k, heap_dis, heap_ids);
+                    break;
+                }
 
             case 16:
-                pq_estimators_from_tables<uint16_t, C>(
-                        pq,
-                        (uint16_t*)codes,
-                        ncodes,
-                        dis_table,
-                        k,
-                        heap_dis,
-                        heap_ids);
-                break;
+                {
+                    // SCOPED_TIMER("PQ::estimators_from_tables <uint16>");
+
+                    pq_estimators_from_tables<uint16_t, C>(
+                            pq,
+                            (uint16_t*)codes,
+                            ncodes,
+                            dis_table,
+                            k,
+                            heap_dis,
+                            heap_ids);
+                    break;
+                }
 
             default:
-                pq_estimators_from_tables_generic<C>(
-                        pq,
-                        nbits,
-                        codes,
-                        ncodes,
-                        dis_table,
-                        k,
-                        heap_dis,
-                        heap_ids);
-                break;
+                {
+                    // SCOPED_TIMER("PQ::estimators_from_tables <default>");
+
+                    pq_estimators_from_tables_generic<C>(
+                            pq,
+                            nbits,
+                            codes,
+                            ncodes,
+                            dis_table,
+                            k,
+                            heap_dis,
+                            heap_ids);
+                    break;
+                }
         }
 
         if (init_finalize_heap) {
@@ -746,6 +768,7 @@ void ProductQuantizer::search(
         const size_t ncodes,
         float_maxheap_array_t* res,
         bool init_finalize_heap) const {
+    SCOPED_TIMER("PQ::search");
     FAISS_THROW_IF_NOT(nx == res->nh);
     std::unique_ptr<float[]> dis_tables(new float[nx * ksub * M]);
     compute_distance_tables(nx, x, dis_tables.get());
