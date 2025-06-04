@@ -20,6 +20,7 @@
 #include <faiss/utils/Heap.h>
 #include <faiss/utils/distances.h>
 #include <faiss/utils/utils.h>
+#include <faiss/utils/TimeProfiler.h>
 
 #include <faiss/Clustering.h>
 
@@ -68,6 +69,7 @@ IndexIVFPQ::IndexIVFPQ(
  * training                                                     */
 
 void IndexIVFPQ::train_encoder(idx_t n, const float* x, const idx_t* assign) {
+    SCOPED_TIMER("IVFPQ::train_encoder");
     pq.train(n, x);
 
     if (do_polysemous_training) {
@@ -218,6 +220,7 @@ void IndexIVFPQ::add_core_o(
         float* residuals_2,
         const idx_t* precomputed_idx,
         void* inverted_list_context) {
+    SCOPED_TIMER("IVFPQ::add_core_o");
     idx_t bs = index_ivfpq_add_core_o_bs;
     if (n > bs) {
         for (idx_t i0 = 0; i0 < n; i0 += bs) {
@@ -252,6 +255,7 @@ void IndexIVFPQ::add_core_o(
     if (precomputed_idx) {
         idx = precomputed_idx;
     } else {
+        SCOPED_TIMER("IVFPQ::coarse_quantizer_assign");
         idx_t* idx0 = new idx_t[n];
         del_idx.reset(idx0);
         quantizer->assign(n, x, idx0);
@@ -265,12 +269,16 @@ void IndexIVFPQ::add_core_o(
     std::unique_ptr<const float[]> del_to_encode;
 
     if (by_residual) {
+        SCOPED_TIMER("IVFPQ::compute_residuals");
         del_to_encode = compute_residuals(quantizer, n, x, idx);
         to_encode = del_to_encode.get();
     } else {
         to_encode = x;
     }
-    pq.compute_codes(to_encode, xcodes.get(), n);
+    {
+        SCOPED_TIMER("IVFPQ::pq_encode");
+        pq.compute_codes(to_encode, xcodes.get(), n);
+    }
 
     double t2 = getmillisecs();
     // TODO: parallelize?
@@ -287,8 +295,11 @@ void IndexIVFPQ::add_core_o(
         }
 
         uint8_t* code = xcodes.get() + i * code_size;
-        size_t offset =
-                invlists->add_entry(key, id, code, inverted_list_context);
+        size_t offset;
+        {
+            SCOPED_TIMER("IVFPQ::invlist_add_entry");
+            offset = invlists->add_entry(key, id, code, inverted_list_context);
+        }
 
         if (residuals_2) {
             float* res2 = residuals_2 + i * d;
@@ -547,6 +558,7 @@ struct QueryTables {
 
     // query-specific initialization
     void init_query(const float* qi) {
+        SCOPED_TIMER("IVFPQ::init_query");
         this->qi = qi;
         if (metric_type == METRIC_INNER_PRODUCT)
             init_query_IP();
@@ -584,6 +596,7 @@ struct QueryTables {
     /// sim_table that will be used for accumulation
     /// and dis0, the initial value
     float precompute_list_tables() {
+        SCOPED_TIMER("IVFPQ::precompute_list_tables");
         float dis0 = 0;
         uint64_t t0;
         TIC;
@@ -867,6 +880,7 @@ struct IVFPQScannerT : QueryTables {
             size_t ncode,
             const uint8_t* codes,
             SearchResultType& res) const {
+        SCOPED_TIMER("IVFPQ::scan_list_with_table");
         int counter = 0;
 
         size_t saved_j[4] = {0, 0, 0, 0};
@@ -1231,6 +1245,7 @@ struct IVFPQScanner : IVFPQScannerT<idx_t, METRIC_TYPE, PQDecoder>,
             float* heap_sim,
             idx_t* heap_ids,
             size_t k) const override {
+        SCOPED_TIMER("IVFPQ::scan_codes");
         KnnSearchResults<C, use_sel> res = {
                 /* key */ this->key,
                 /* ids */ this->store_pairs ? nullptr : ids,

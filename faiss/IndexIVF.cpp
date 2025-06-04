@@ -21,6 +21,7 @@
 
 #include <faiss/utils/hamming.h>
 #include <faiss/utils/utils.h>
+#include <faiss/utils/TimeProfiler.h>
 
 #include <faiss/IndexFlat.h>
 #include <faiss/impl/AuxIndexStructures.h>
@@ -300,6 +301,7 @@ void IndexIVF::search(
         float* distances,
         idx_t* labels,
         const SearchParameters* params_in) const {
+    SCOPED_TIMER("IVF::search");
     FAISS_THROW_IF_NOT(k > 0);
     const IVFSearchParameters* params = nullptr;
     if (params_in) {
@@ -321,18 +323,26 @@ void IndexIVF::search(
         std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
 
         double t0 = getmillisecs();
-        quantizer->search(
-                n,
-                x,
-                nprobe,
-                coarse_dis.get(),
-                idx.get(),
-                params ? params->quantizer_params : nullptr);
+        {
+            SCOPED_TIMER("IVF::coarse_search");
+            quantizer->search(
+                    n,
+                    x,
+                    nprobe,
+                    coarse_dis.get(),
+                    idx.get(),
+                    params ? params->quantizer_params : nullptr);
+        }
 
         double t1 = getmillisecs();
-        invlists->prefetch_lists(idx.get(), n * nprobe);
+        {
+            SCOPED_TIMER("IVF::invlist_prefetch");
+            invlists->prefetch_lists(idx.get(), n * nprobe);
+        }
 
-        search_preassigned(
+        {
+            SCOPED_TIMER("IVF::search_preassigned");
+            search_preassigned(
                 n,
                 x,
                 k,
@@ -343,6 +353,7 @@ void IndexIVF::search(
                 false,
                 params,
                 ivf_stats);
+        }
         double t2 = getmillisecs();
         ivf_stats->quantization_time += t1 - t0;
         ivf_stats->search_time += t2 - t0;
@@ -603,12 +614,15 @@ void IndexIVF::search_preassigned(
 
                 // loop over probes
                 for (size_t ik = 0; ik < nprobe; ik++) {
+                    {
+                    SCOPED_TIMER("IVF::scan_one_list");
                     nscan += scan_one_list(
-                            keys[i * nprobe + ik],
-                            coarse_dis[i * nprobe + ik],
-                            simi,
-                            idxi,
-                            max_codes - nscan);
+                                keys[i * nprobe + ik],
+                                coarse_dis[i * nprobe + ik],
+                                simi,
+                                idxi,
+                                max_codes - nscan);
+                }
                     if (nscan >= max_codes) {
                         break;
                     }

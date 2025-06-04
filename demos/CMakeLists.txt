@@ -29,3 +29,6 @@ target_link_libraries(demo_pq_profiling PRIVATE faiss_avx2)
 
 add_executable(demo_yoochan EXCLUDE_FROM_ALL demo_yoochan.cpp)
 target_link_libraries(demo_yoochan PRIVATE faiss_avx2)
+
+add_executable(demo_index_profiling_comparison EXCLUDE_FROM_ALL demo_index_profiling_comparison.cpp)
+target_link_libraries(demo_index_profiling_comparison PRIVATE faiss_avx2)
