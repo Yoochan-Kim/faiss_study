@@ -119,6 +119,7 @@ static void init_hypercube_pca(
             for (int k = 0; k < nbits; k++)
                 cent[j] += f * sqrt(pca.eigenvalues[k]) *
                         (((i >> k) & 1) ? 1 : -1) * pca.PCAMat[j + k * d];
+            }
         }
     }
 }
@@ -410,27 +411,35 @@ void ProductQuantizer::compute_codes(const float* x, uint8_t* codes, size_t n)
     }
 
     if (dsub < 16) { // simple direct computation
-
+        {
+            SCOPED_TIMER("PQ::compute_codes_direct");
 #pragma omp parallel for
-        for (int64_t i = 0; i < n; i++)
-            compute_code(x + i * d, codes + i * code_size);
+            for (int64_t i = 0; i < n; i++)
+                compute_code(x + i * d, codes + i * code_size);
+        }
 
     } else { // worthwhile to use BLAS
         std::unique_ptr<float[]> dis_tables(new float[n * ksub * M]);
-        compute_distance_tables(n, x, dis_tables.get());
+        {
+            SCOPED_TIMER("PQ::compute_distance_tables_for_codes");
+            compute_distance_tables(n, x, dis_tables.get());
+        }
 
+        {
+            SCOPED_TIMER("PQ::compute_codes_from_tables");
 #pragma omp parallel for
-        for (int64_t i = 0; i < n; i++) {
-            uint8_t* code = codes + i * code_size;
-            const float* tab = dis_tables.get() + i * ksub * M;
-            compute_code_from_distance_table(tab, code);
+            for (int64_t i = 0; i < n; i++) {
+                uint8_t* code = codes + i * code_size;
+                const float* tab = dis_tables.get() + i * ksub * M;
+                compute_code_from_distance_table(tab, code);
+            }
         }
     }
 }
 
 void ProductQuantizer::compute_distance_table(const float* x, float* dis_table)
         const {
-    SCOPED_TIMER("PQ::compute_distance_table");
+    // SCOPED_TIMER("PQ::compute_distance_table"); // 제거 - compute_distance_tables에서 OpenMP로 호출됨
     if (transposed_centroids.empty()) {
         // use regular version
         for (size_t m = 0; m < M; m++) {
@@ -492,10 +501,11 @@ void ProductQuantizer::compute_distance_tables(
         }
 
     } else { // use BLAS
-    SCOPED_TIMER("PQ::compute_distance_tables (blas)");
+        SCOPED_TIMER("PQ::compute_distance_tables (blas)");
 
-
-        for (int m = 0; m < M; m++) {
+        {
+            SCOPED_TIMER("PQ::compute_distance_tables_blas_loop");
+            for (int m = 0; m < M; m++) {
             pairwise_L2sqr(
                     dsub,
                     nx,
@@ -506,6 +516,7 @@ void ProductQuantizer::compute_distance_tables(
                     d,
                     dsub,
                     ksub * M);
+            }
         }
     }
 }

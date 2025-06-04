@@ -59,6 +59,7 @@ void hnsw_add_vertices(
         const float* x,
         bool verbose,
         bool preset_levels = false) {
+    SCOPED_TIMER("hnsw_add_vertices");
     size_t d = index_hnsw.d;
     HNSW& hnsw = index_hnsw.hnsw;
     size_t ntotal = n0 + n;
@@ -137,8 +138,10 @@ void hnsw_add_vertices(
 
             bool interrupt = false;
 
-#pragma omp parallel if (i1 > i0 + 100)
             {
+                SCOPED_TIMER("hnsw_add_vertices::level_batch");
+#pragma omp parallel if (i1 > i0 + 100)
+                {
                 VisitedTable vt(ntotal);
 
                 std::unique_ptr<DistanceComputer> dis(
@@ -180,7 +183,8 @@ void hnsw_add_vertices(
                     }
                     counter++;
                 }
-            }
+                }
+            } // end of SCOPED_TIMER
             if (interrupt) {
                 FAISS_THROW_MSG("computation interrupted");
             }
@@ -239,6 +243,7 @@ void hnsw_search(
         const float* x,
         BlockResultHandler& bres,
         const SearchParameters* params) {
+    SCOPED_TIMER("IndexHNSW::hnsw_search");
     FAISS_THROW_IF_NOT_MSG(
             index->storage,
             "No storage index, please use IndexHNSWFlat (or variants) "
@@ -260,8 +265,10 @@ void hnsw_search(
     for (idx_t i0 = 0; i0 < n; i0 += check_period) {
         idx_t i1 = std::min(i0 + check_period, n);
 
-#pragma omp parallel if (i1 - i0 > 1)
         {
+            SCOPED_TIMER("IndexHNSW::search_batch");
+#pragma omp parallel if (i1 - i0 > 1)
+            {
             VisitedTable vt(index->ntotal);
             typename BlockResultHandler::SingleResultHandler res(bres);
 
@@ -280,7 +287,8 @@ void hnsw_search(
                 nhops += stats.nhops;
                 res.end();
             }
-        }
+            }
+        } // end of SCOPED_TIMER
         InterruptCallback::check();
     }
 

@@ -102,10 +102,8 @@ void search_with_refinement(
             exact_results.reserve(k_refine);
             
             // Step 2a: Load vectors and compute exact distances
-            {
-                SCOPED_TIMER("HNSWPQ_refinement::compute_exact_distances");
-                
-                for (size_t j = 0; j < k_refine; j++) {
+            // OpenMP parallel for 내부에서는 타이머를 사용하지 않음
+            for (size_t j = 0; j < k_refine; j++) {
                     idx_t id = candidates[j];
                     if (id < 0) continue;  // Skip invalid results
                     
@@ -116,23 +114,19 @@ void search_with_refinement(
                     float dist = fvec_L2sqr(query, vec, index.d);
                     exact_results.push_back({dist, id});
                 }
-            }
             
             // Step 2b: Sort by exact distance
-            {
-                SCOPED_TIMER("HNSWPQ_refinement::rerank");
-                std::partial_sort(
+            // OpenMP parallel for 내부에서는 타이머를 사용하지 않음
+            std::partial_sort(
                     exact_results.begin(),
                     exact_results.begin() + std::min(k, exact_results.size()),
                     exact_results.end(),
                     [](const auto& a, const auto& b) { return a.first < b.first; }
                 );
-            }
             
             // Step 2c: Copy final results
-            {
-                SCOPED_TIMER("HNSWPQ_refinement::copy_results");
-                size_t n_copy = std::min(k, exact_results.size());
+            // OpenMP parallel for 내부에서는 타이머를 사용하지 않음
+            size_t n_copy = std::min(k, exact_results.size());
                 for (size_t j = 0; j < n_copy; j++) {
                     query_distances[j] = exact_results[j].first;
                     query_labels[j] = exact_results[j].second;
@@ -143,7 +137,6 @@ void search_with_refinement(
                     query_labels[j] = -1;
                 }
             }
-        }
     }
 }
 
