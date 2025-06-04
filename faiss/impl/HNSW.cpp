@@ -14,7 +14,6 @@
 #include <faiss/impl/IDSelector.h>
 #include <faiss/impl/ResultHandler.h>
 #include <faiss/utils/prefetch.h>
-#include <faiss/utils/TimeProfiler.h>
 
 #include <faiss/impl/platform_macros.h>
 
@@ -528,7 +527,6 @@ void HNSW::add_with_locks(
         std::vector<omp_lock_t>& locks,
         VisitedTable& vt,
         bool keep_max_size_level0) {
-    SCOPED_TIMER("HNSW::add_with_locks");
     //  greedy search on upper levels
 
     storage_idx_t nearest;
@@ -552,12 +550,10 @@ void HNSW::add_with_locks(
     float d_nearest = ptdis(nearest);
 
     for (; level > pt_level; level--) {
-        SCOPED_TIMER("HNSW::greedy_search_upper_levels");
         greedy_update_nearest(*this, ptdis, level, nearest, d_nearest);
     }
 
     for (; level >= 0; level--) {
-        SCOPED_TIMER("HNSW::add_links_level");
         add_links_starting_from(
                 ptdis,
                 pt_id,
@@ -595,7 +591,6 @@ int search_from_candidates(
         int level,
         int nres_in,
         const SearchParameters* params) {
-    SCOPED_TIMER("HNSW::search_from_candidates");
     int nres = nres_in;
     int ndis = 0;
 
@@ -933,7 +928,6 @@ HNSWStats HNSW::search(
         ResultHandler<C>& res,
         VisitedTable& vt,
         const SearchParameters* params) const {
-    SCOPED_TIMER("HNSW::search");
     HNSWStats stats;
     if (entry_point == -1) {
         return stats;
@@ -955,7 +949,6 @@ HNSWStats HNSW::search(
     float d_nearest = qdis(nearest);
 
     for (int level = max_level; level >= 1; level--) {
-        SCOPED_TIMER("HNSW::search_upper_levels");
         HNSWStats local_stats =
                 greedy_update_nearest(*this, qdis, level, nearest, d_nearest);
         stats.combine(local_stats);
