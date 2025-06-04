@@ -29,3 +29,12 @@ target_link_libraries(demo_pq_profiling PRIVATE faiss_avx2)
 
 add_executable(demo_yoochan EXCLUDE_FROM_ALL demo_yoochan.cpp)
 target_link_libraries(demo_yoochan PRIVATE faiss_avx2)
+
+add_executable(demo_hnsw_profiling EXCLUDE_FROM_ALL demo_hnsw_profiling.cpp)
+target_link_libraries(demo_hnsw_profiling PRIVATE faiss_avx2)
+
+add_executable(demo_hnswpq_profiling EXCLUDE_FROM_ALL demo_hnswpq_profiling.cpp)
+target_link_libraries(demo_hnswpq_profiling PRIVATE faiss_avx2)
+
+add_executable(demo_hnswpq_refinement_profiling EXCLUDE_FROM_ALL demo_hnswpq_refinement_profiling.cpp)
+target_link_libraries(demo_hnswpq_refinement_profiling PRIVATE faiss_avx2)
