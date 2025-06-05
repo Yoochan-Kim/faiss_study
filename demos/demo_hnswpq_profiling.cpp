@@ -142,10 +142,10 @@ int main(int argc, char** argv) {
                efConstruction, efSearch, k);
 
         IndexFlatL2 flat_index(d);
-        flat_index.add(nb, base_data);
+        flat_index.add(nb, base_data.data());
 
         std::vector<idx_t> ground_truth_labels(nq);
-        compute_ground_truth_labels(flat_index, query_data, nq, ground_truth_labels);
+        compute_ground_truth_labels(flat_index, query_data.data(), nq, ground_truth_labels);
         
         // Create index
         IndexHNSWPQ index(d, M_pq, M_hnsw, nbits_pq);
