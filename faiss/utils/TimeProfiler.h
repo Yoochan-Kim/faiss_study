@@ -60,7 +60,7 @@ public:
     }
     
     void printReport() const {
-        std::cout << "\n=== PQ Time Profiling Report ===" << std::endl;
+        std::cout << "\n=== Time Profiling Report ===" << std::endl;
         std::cout << std::setw(40) << "Operation" 
                   << std::setw(15) << "Total (ms)"
                   << std::setw(15) << "Avg (ms)"

@@ -25,6 +25,44 @@
 
 using namespace faiss;
 
+static void compute_ground_truth_labels(
+    IndexFlatL2& flat_index,
+    const float* query_data,    // 길이 = nq * d
+    size_t nq,                  // 쿼리 수
+    std::vector<idx_t>& ground_truth_labels  // 크기 = nq
+) {
+    std::vector<float> distances_gt(nq);
+    flat_index.search(
+        nq,
+        query_data,
+        1,                      // Top-1
+        distances_gt.data(),
+        ground_truth_labels.data()
+    );
+}
+
+static void compute_recall(
+    const std::vector<idx_t>& labels,          // 검색된 k개의 인덱스 (flattened, 크기 = nq * k)
+    const std::vector<idx_t>& ground_truth,    // 쿼리당 정답 인덱스 (크기 = nq)
+    int k                                             // Top-k
+) {
+    size_t nq = ground_truth.size();
+    size_t correct = 0;
+
+    // 각 쿼리별로 Top-k 내부에 정답이 존재하는지 확인
+    for (size_t i = 0; i < nq; i++) {
+        for (int j = 0; j < k; j++) {
+            if (labels[i * k + j] == ground_truth[i]) {
+                correct++;
+                break;
+            }
+        }
+    }
+
+    float recall = (nq > 0) ? (static_cast<float>(correct) / nq) : 0.0f;
+    printf("Recall@%d: %.4f\n", k, recall);
+}
+
 // Read fvecs file format
 static void read_fvecs(
     const char* fname,
@@ -71,9 +109,7 @@ void search_with_refinement(
     size_t k_refine,  // number of candidates to refine
     float* distances,
     idx_t* labels
-) {
-    SCOPED_TIMER("HNSWPQ_refinement::search_total");
-    
+) {    
     // Allocate space for initial search results
     std::vector<float> coarse_distances(k_refine * nq);
     std::vector<idx_t> coarse_labels(k_refine * nq);
@@ -186,6 +222,12 @@ int main(int argc, char** argv) {
         printf("  M_hnsw=%d, M_pq=%d, nbits=%d\n", M_hnsw, M_pq, nbits_pq);
         printf("  efConstruction=%d, efSearch=%d\n", efConstruction, efSearch);
         printf("  k=%zu, k_refine=%zu\n\n", k, k_refine);
+
+        IndexFlatL2 flat_index(d);
+        flat_index.add(nb, base_data);
+
+        std::vector<idx_t> ground_truth_labels(nq);
+        compute_ground_truth_labels(flat_index, query_data, nq, ground_truth_labels);
         
         // Create index
         IndexHNSWPQ index(d, M_pq, M_hnsw, nbits_pq);
@@ -231,8 +273,12 @@ int main(int argc, char** argv) {
         const int num_runs = 100;
         
         for (int run = 0; run < num_runs; run++) {
-            search_with_refinement(index, base_data, nq, query_data.data(), 
-                                 k, k_refine, distances.data(), labels.data());
+            {
+                SCOPED_TIMER("HNSWPQ_refinement::search_total");
+                search_with_refinement(index, base_data, nq, query_data.data(), 
+                                     k, k_refine, distances.data(), labels.data());   
+            }
+            compute_recall(labels, ground_truth_labels, k);
         }
         
         printf("\nSearch with refinement phase profiling:\n");
@@ -261,8 +307,12 @@ int main(int argc, char** argv) {
             
             // Run search multiple times
             for (int run = 0; run < 10; run++) {
-                search_with_refinement(index, base_data, nq, query_data.data(), 
-                                     k, kr, distances.data(), labels.data());
+                {
+                    SCOPED_TIMER("HNSWPQ_refinement::search_total");
+                    search_with_refinement(index, base_data, nq, query_data.data(), 
+                                         k, kr, distances.data(), labels.data());
+                }
+                compute_recall(labels, ground_truth_labels, k);
             }
             
             printf("\nk_refine = %zu:\n", kr);
