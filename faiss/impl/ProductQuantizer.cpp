@@ -119,7 +119,6 @@ static void init_hypercube_pca(
             for (int k = 0; k < nbits; k++)
                 cent[j] += f * sqrt(pca.eigenvalues[k]) *
                         (((i >> k) & 1) ? 1 : -1) * pca.PCAMat[j + k * d];
-            }
         }
     }
 }
