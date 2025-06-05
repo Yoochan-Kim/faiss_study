@@ -438,7 +438,7 @@ void ProductQuantizer::compute_codes(const float* x, uint8_t* codes, size_t n)
 
 void ProductQuantizer::compute_distance_table(const float* x, float* dis_table)
         const {
-    // SCOPED_TIMER("PQ::compute_distance_table"); // 제거 - compute_distance_tables에서 OpenMP로 호출됨
+    SCOPED_TIMER("PQ::compute_distance_table"); // 제거 - compute_distance_tables에서 OpenMP로 호출됨
     if (transposed_centroids.empty()) {
         // use regular version
         for (size_t m = 0; m < M; m++) {
@@ -468,7 +468,7 @@ void ProductQuantizer::compute_inner_prod_table(
         const float* x,
         float* dis_table) const {
     size_t m;
-
+    SCOPED_TIMER("PQ::compute_inner_prod_table");
     for (m = 0; m < M; m++) {
         fvec_inner_products_ny(
                 dis_table + m * ksub,

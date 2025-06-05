@@ -139,6 +139,8 @@ int main(int argc, char** argv) {
         compute_ground_truth_labels(flat_index, query_data.data(), nq, ground_truth_labels);
 
         // Create index
+        TimeProfiler::getInstance().reset();
+        SCOPED_TIMER("HNSW::create_index");
         IndexHNSWFlat index(d, M);
         index.hnsw.efConstruction = efConstruction;
         
@@ -167,14 +169,15 @@ int main(int argc, char** argv) {
         
         // Search profiling
         printf("\nPerforming searches...\n");
-        const int num_runs = 100;
+        const int num_runs = 10;
         
         for (int run = 0; run < num_runs; run++) {
             {
                 SCOPED_TIMER("HNSW::search_total");
                 index.search(nq, query_data.data(), k, distances.data(), labels.data());
             }
-            compute_recall(labels, ground_truth_labels, k);
+            if(run == num_runs-1)
+                compute_recall(labels, ground_truth_labels, k);
         }
         
         printf("\nSearch phase profiling:\n");
@@ -194,7 +197,8 @@ int main(int argc, char** argv) {
                     SCOPED_TIMER("HNSW::search_total");
                     index.search(nq, query_data.data(), k, distances.data(), labels.data());
                 }
-                compute_recall(labels, ground_truth_labels, k);
+                if(run == num_runs-1)
+                    compute_recall(labels, ground_truth_labels, k);
             }
             
             printf("\nefSearch = %d:\n", ef);

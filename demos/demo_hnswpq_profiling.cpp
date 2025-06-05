@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
         size_t d = d_base;
         const size_t k = 10;              // number of neighbors
         const int M_hnsw = 32;            // HNSW connectivity parameter
-        const int M_pq = 8;               // PQ subquantizers
+        const int M_pq = 16;               // PQ subquantizers
         const int nbits_pq = 8;           // bits per subquantizer
         const int efConstruction = 200;   // construction parameter
         const int efSearch = 50;          // search parameter
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
         printf("Training PQ...\n");
         {
             SCOPED_TIMER("HNSWPQ::train_total");
-            index.train(n_learn, learn_data.data());
+            index.train(nb, base_data.data());
         }
         
         printf("\nTraining phase profiling:\n");
@@ -187,34 +187,35 @@ int main(int argc, char** argv) {
         
         // Search profiling
         printf("\nPerforming searches...\n");
-        const int num_runs = 100;
+        const int num_runs = 10;
         
         for (int run = 0; run < num_runs; run++) {
             {
                 SCOPED_TIMER("HNSWPQ::search_total");
                 index.search(nq, query_data.data(), k, distances.data(), labels.data());
             }
-            compute_recall(labels, ground_truth_labels, k);
+            if(run == num_runs-1)
+                compute_recall(labels, ground_truth_labels, k);
         }
         
         printf("\nSearch phase profiling:\n");
         TimeProfiler::getInstance().printReport();
         
         // Get underlying PQ for detailed analysis
-        IndexPQ* pq_index = dynamic_cast<IndexPQ*>(index.storage);
-        if (pq_index) {
-            printf("\n\n=== PQ-specific operations analysis ===\n");
-            TimeProfiler::getInstance().reset();
+        // IndexPQ* pq_index = dynamic_cast<IndexPQ*>(index.storage);
+        // if (pq_index) {
+        //     printf("\n\n=== PQ-specific operations analysis ===\n");
+        //     TimeProfiler::getInstance().reset();
             
-            // Test distance table computation separately
-            std::vector<float> dis_tables(nq * pq_index->pq.ksub * pq_index->pq.M);
-            for (int i = 0; i < 10; i++) {
-                SCOPED_TIMER("PQ::compute_distance_tables_standalone");
-                pq_index->pq.compute_distance_tables(nq, query_data.data(), dis_tables.data());
-            }
+        //     // Test distance table computation separately
+        //     std::vector<float> dis_tables(nq * pq_index->pq.ksub * pq_index->pq.M);
+        //     for (int i = 0; i < 10; i++) {
+        //         SCOPED_TIMER("PQ::compute_distance_tables_standalone");
+        //         pq_index->pq.compute_distance_tables(nq, query_data.data(), dis_tables.data());
+        //     }
             
-            TimeProfiler::getInstance().printReport();
-        }
+        //     TimeProfiler::getInstance().printReport();
+        // }
         
         // Analyze search with different ef values
         printf("\n\n=== Analysis with different efSearch values ===\n");
@@ -230,7 +231,8 @@ int main(int argc, char** argv) {
                     SCOPED_TIMER("HNSWPQ::search_total");
                     index.search(nq, query_data.data(), k, distances.data(), labels.data());
                 }
-                compute_recall(labels, ground_truth_labels, k);
+                if(run == num_runs-1)
+                    compute_recall(labels, ground_truth_labels, k);
             }
             
             printf("\nefSearch = %d:\n", ef);

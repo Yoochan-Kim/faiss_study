@@ -6,7 +6,7 @@
  */
 
 #include <faiss/impl/HNSW.h>
-
+#include <omp.h>
 #include <cstddef>
 
 #include <faiss/impl/AuxIndexStructures.h>
@@ -528,8 +528,11 @@ void HNSW::add_with_locks(
         std::vector<omp_lock_t>& locks,
         VisitedTable& vt,
         bool keep_max_size_level0) {
-    // SCOPED_TIMER("HNSW::add_with_locks"); // 제거 - OpenMP parallel for 내부에서 호출됨
+    // SCOPED_TIMER("HNSW::add_with_locks");
     //  greedy search on upper levels
+    // int tid = omp_get_thread_num();
+    // int in_par = omp_in_parallel();
+    // printf("DEBUG: add_with_locks → tid=%d, in_parallel=%d\n", tid, in_par);
 
     storage_idx_t nearest;
 #pragma omp critical
@@ -551,20 +554,25 @@ void HNSW::add_with_locks(
     int level = max_level; // level at which we start adding neighbors
     float d_nearest = ptdis(nearest);
 
-    for (; level > pt_level; level--) {
-        greedy_update_nearest(*this, ptdis, level, nearest, d_nearest);
+    {
+        SCOPED_TIMER("HNSW::add_with_locks::g.u.n");
+        for (; level > pt_level; level--) {
+            greedy_update_nearest(*this, ptdis, level, nearest, d_nearest);
+        }
     }
-
-    for (; level >= 0; level--) {
-        add_links_starting_from(
-                ptdis,
-                pt_id,
-                nearest,
-                d_nearest,
-                level,
-                locks.data(),
-                vt,
-                keep_max_size_level0);
+    {
+        SCOPED_TIMER("HNSW::add_with_locks::a.l.s.f");
+        for (; level >= 0; level--) {
+            add_links_starting_from(
+                    ptdis,
+                    pt_id,
+                    nearest,
+                    d_nearest,
+                    level,
+                    locks.data(),
+                    vt,
+                    keep_max_size_level0);
+        }
     }
 
     omp_unset_lock(&locks[pt_id]);
@@ -930,7 +938,7 @@ HNSWStats HNSW::search(
         ResultHandler<C>& res,
         VisitedTable& vt,
         const SearchParameters* params) const {
-    // SCOPED_TIMER("HNSW::search"); // 제거 - 멀티스레드 환경에서 중복 호출됨
+    SCOPED_TIMER("HNSW::search"); // 제거 - 멀티스레드 환경에서 중복 호출됨
     HNSWStats stats;
     if (entry_point == -1) {
         return stats;
@@ -952,7 +960,7 @@ HNSWStats HNSW::search(
     float d_nearest = qdis(nearest);
 
     {
-        // SCOPED_TIMER("HNSW::search_upper_levels"); // 제거 - 멀티스레드 환경에서 중복 호출됨
+        SCOPED_TIMER("HNSW::search_upper_levels"); // 제거 - 멀티스레드 환경에서 중복 호출됨
         for (int level = max_level; level >= 1; level--) {
             HNSWStats local_stats =
                     greedy_update_nearest(*this, qdis, level, nearest, d_nearest);
@@ -967,7 +975,7 @@ HNSWStats HNSW::search(
         candidates.push(nearest, d_nearest);
 
         {
-            // SCOPED_TIMER("HNSW::search_level_0"); // 제거 - 멀티스레드 환경에서 중복 호출됨
+            SCOPED_TIMER("HNSW::search_level_0"); // 제거 - 멀티스레드 환경에서 중복 호출됨
             search_from_candidates(
                     *this, qdis, res, candidates, vt, stats, 0, 0, params);
         }

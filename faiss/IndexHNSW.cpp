@@ -75,22 +75,30 @@ void hnsw_add_vertices(
     if (n == 0) {
         return;
     }
-
-    int max_level = hnsw.prepare_level_tab(n, preset_levels);
+    int max_level;
+    
+    {
+        SCOPED_TIMER("hnsw_add_vertices::prepare_level_tab");
+        max_level = hnsw.prepare_level_tab(n, preset_levels);
+    }
 
     if (verbose) {
         printf("  max_level = %d\n", max_level);
     }
 
     std::vector<omp_lock_t> locks(ntotal);
-    for (int i = 0; i < ntotal; i++)
-        omp_init_lock(&locks[i]);
+    {
+        SCOPED_TIMER("hnsw_add_vertices::omp_init_locks");
+        for (int i = 0; i < ntotal; i++)
+            omp_init_lock(&locks[i]);
+    }
 
     // add vectors from highest to lowest level
     std::vector<int> hist;
     std::vector<int> order(n);
 
     { // make buckets with vectors of the same level
+        SCOPED_TIMER("hnsw_add_vertices::make buckets");
 
         // build histogram
         for (int i = 0; i < n; i++) {
@@ -162,14 +170,16 @@ void hnsw_add_vertices(
                     if (interrupt) {
                         continue;
                     }
-
-                    hnsw.add_with_locks(
-                            *dis,
-                            pt_level,
-                            pt_id,
-                            locks,
-                            vt,
-                            index_hnsw.keep_max_size_level0 && (pt_level == 0));
+                    {
+                        SCOPED_TIMER("HNSW::add_with_locks");
+                        hnsw.add_with_locks(
+                                *dis,
+                                pt_level,
+                                pt_id,
+                                locks,
+                                vt,
+                                index_hnsw.keep_max_size_level0 && (pt_level == 0));
+                    }
 
                     if (prev_display >= 0 && i - i0 > prev_display + 10000) {
                         prev_display = i - i0;
@@ -668,9 +678,14 @@ IndexHNSWPQ::IndexHNSWPQ(
 }
 
 void IndexHNSWPQ::train(idx_t n, const float* x) {
-    SCOPED_TIMER("IndexHNSWPQ::train");
-    IndexHNSW::train(n, x);
-    (dynamic_cast<IndexPQ*>(storage))->pq.compute_sdc_table();
+    {
+        SCOPED_TIMER("IndexHNSW::train");
+        IndexHNSW::train(n, x);
+    }
+    {
+        SCOPED_TIMER("IndexPQ::compute_sdc_table");
+        (dynamic_cast<IndexPQ*>(storage))->pq.compute_sdc_table();
+    }
 }
 
 /**************************************************************

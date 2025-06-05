@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
         const size_t k = 10;              // final number of neighbors
         const size_t k_refine = 100;      // number of candidates for refinement
         const int M_hnsw = 32;            // HNSW connectivity parameter
-        const int M_pq = 8;               // PQ subquantizers
+        const int M_pq = 16;               // PQ subquantizers
         const int nbits_pq = 8;           // bits per subquantizer
         const int efConstruction = 200;   // construction parameter
         const int efSearch = 50;          // search parameter
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
         printf("Training PQ...\n");
         {
             SCOPED_TIMER("HNSWPQ_refinement::train_total");
-            index.train(n_learn, learn_data.data());
+            index.train(nb, base_data.data());
         }
         
         printf("\nTraining phase profiling:\n");
@@ -278,7 +278,8 @@ int main(int argc, char** argv) {
                 search_with_refinement(index, base_data, nq, query_data.data(), 
                                      k, k_refine, distances.data(), labels.data());   
             }
-            compute_recall(labels, ground_truth_labels, k);
+            if(run == num_runs-1)
+                compute_recall(labels, ground_truth_labels, k);
         }
         
         printf("\nSearch with refinement phase profiling:\n");
@@ -312,7 +313,8 @@ int main(int argc, char** argv) {
                     search_with_refinement(index, base_data, nq, query_data.data(), 
                                          k, kr, distances.data(), labels.data());
                 }
-                compute_recall(labels, ground_truth_labels, k);
+                if(run == num_runs-1)
+                    compute_recall(labels, ground_truth_labels, k);
             }
             
             printf("\nk_refine = %zu:\n", kr);

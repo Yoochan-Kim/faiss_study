@@ -16,6 +16,8 @@
 #include <algorithm>
 #include <memory>
 
+// #include <faiss/utils/TimeProfiler.h>
+
 #include <faiss/impl/DistanceComputer.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/utils/hamming.h>
@@ -84,6 +86,8 @@ struct PQDistanceComputer : FlatCodesDistanceComputer {
     size_t ndis;
 
     float distance_to_code(const uint8_t* code) final {
+        // SCOPED_TIMER("PQ::distance_to_code");
+        // printf("PQ::distance_to_code (call)");
         ndis++;
 
         float dis = distance_single_code<PQDecoder>(
@@ -125,6 +129,8 @@ struct PQDistanceComputer : FlatCodesDistanceComputer {
 
     void set_query(const float* x) override {
         if (metric == METRIC_L2) {
+            // SCOPED_TIMER("PQ::compute_distance_table (call)");
+            // printf("PQ::compute_distance_table (call)");
             pq.compute_distance_table(x, precomputed_table.data());
         } else {
             pq.compute_inner_prod_table(x, precomputed_table.data());
