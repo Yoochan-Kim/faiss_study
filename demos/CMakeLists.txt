@@ -38,3 +38,9 @@ target_link_libraries(demo_hnswpq_profiling PRIVATE faiss_avx2)
 
 add_executable(demo_hnswpq_refinement_profiling EXCLUDE_FROM_ALL demo_hnswpq_refinement_profiling.cpp)
 target_link_libraries(demo_hnswpq_refinement_profiling PRIVATE faiss_avx2)
+
+add_executable(demo_sift10m_pq_benchmark EXCLUDE_FROM_ALL demo_sift10m_pq_benchmark.cpp)
+target_link_libraries(demo_sift10m_pq_benchmark PRIVATE faiss_avx2)
+find_package(HDF5 REQUIRED)
+target_include_directories(demo_sift10m_pq_benchmark PRIVATE ${HDF5_INCLUDE_DIRS})
+target_link_libraries(demo_sift10m_pq_benchmark PRIVATE ${HDF5_LIBRARIES})

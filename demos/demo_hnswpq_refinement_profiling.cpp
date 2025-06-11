@@ -123,7 +123,8 @@ void search_with_refinement(
     // Step 2: Refinement with exact distances
     {
         SCOPED_TIMER("HNSWPQ_refinement::refinement");
-        
+
+omp_set_num_threads(8);
 #pragma omp parallel for
         for (int64_t i = 0; i < nq; i++) {
             const float* query = queries + i * index.d;
@@ -210,7 +211,7 @@ int main(int argc, char** argv) {
         
         size_t d = d_base;
         const size_t k = 10;              // final number of neighbors
-        const size_t k_refine = 100;      // number of candidates for refinement
+        const size_t k_refine = 20;      // number of candidates for refinement
         const int M_hnsw = 32;            // HNSW connectivity parameter
         const int M_pq = 16;               // PQ subquantizers
         const int nbits_pq = 8;           // bits per subquantizer
@@ -270,7 +271,7 @@ int main(int argc, char** argv) {
         
         // Search profiling
         printf("\nPerforming searches with refinement...\n");
-        const int num_runs = 100;
+        const int num_runs = 10;
         
         for (int run = 0; run < num_runs; run++) {
             {
@@ -299,7 +300,7 @@ int main(int argc, char** argv) {
         
         // Analyze with different refinement sizes
         printf("\n\n=== Analysis with different k_refine values ===\n");
-        const size_t refine_values[] = {20, 50, 100, 200, 500};
+        const size_t refine_values[] = {20}; // 30, 50, 100, 150, 200, 500};
         
         for (size_t kr : refine_values) {
             if (kr > nb) continue;  // Skip if k_refine > database size
